@@ -1,7 +1,7 @@
 // NOTE:
-// This doesn't work, the javascript used to create an element isn't working when accessing in rust. 
+// This doesn't work, the javascript used to create an element isn't working when accessing in rust.
 // eval("console.log(document.head.innerHTML)") gives the expected result, while
-// head.inner_html() doesnt show any changes from the js. 
+// head.inner_html() doesnt show any changes from the js.
 
 // #![cfg(target_arch = "wasm32")]
 
@@ -29,8 +29,6 @@
 //             }
 //         })
 //     };
-
-    
 
 //     main();
 
