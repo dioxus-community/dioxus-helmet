@@ -23,7 +23,7 @@ Import it in your code
 use dioxus_helmet::Helmet;
 ```
 
-Then you can just use in in your components like this
+Then you can just use it anywhere in your components like this:
 
 ```rust
     cx.render(rsx! {
