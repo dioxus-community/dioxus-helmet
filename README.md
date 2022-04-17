@@ -2,6 +2,8 @@
 
 Inspired by react-helmet, this small [Dioxus](https://github.com/DioxusLabs/dioxus) component allows you to place elements in the **head** of your code.
 
+Right now, this works only with the **master branch** of Dioxus.
+
 ## Configuration
 
 Add the package as a dependency to your `Cargo.toml`.
@@ -18,12 +20,12 @@ dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet", default-featur
 
 ## Usage
 
-Import it in your code 
+Import it in your code: 
 ```rust
 use dioxus_helmet::Helmet;
 ```
 
-Then you can just use it anywhere in your components like this:
+Then just use it anywhere in your components like this:
 
 ```rust
     cx.render(rsx! {
@@ -52,7 +54,7 @@ Any children passed to the helmet component will be placed in the `<head></head>
 
 ## License
 
-This project is dual licensed under the MIT license.
+This project is licensed under the [MIT license](https://github.com/saicu/dioxus-helmet/blob/main/LICENSE).
 
 ## Contribution
 
