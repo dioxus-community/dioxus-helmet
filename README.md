@@ -1,18 +1,18 @@
 # dioxus-helmet
 
-Inspired by react-helmet, this small component allows you to place elements in the **head** of your code.
+Inspired by react-helmet, this small [Dioxus](https://github.com/DioxusLabs/dioxus) component allows you to place elements in the **head** of your code.
 
 ## Configuration
 
-Add the package as a dependency in your `Cargo.toml`.
+Add the package as a dependency to your `Cargo.toml`.
 
 ### Web:
-```
+```rust
 dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet" }
 ```
 
-### ~~Desktop:~~ (doesnt work yet)
-```
+### ~~Desktop:~~ (doesn't work yet)
+```rust
 dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet", default-features = false, features = ["desktop"] }
 ```
 
@@ -56,4 +56,4 @@ This project is dual licensed under the MIT license.
 
 ## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in dioxus-helmet by you, shall be licensed as MIT, without any additional terms or conditions
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in dioxus-helmet by you, shall be licensed as MIT, without any additional terms or conditions.
