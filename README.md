@@ -19,13 +19,13 @@ dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet", default-featur
 ## Usage
 
 Import it in your code 
-```
+```rust
 use dioxus_helmet::Helmet;
 ```
 
 Then you can just use in in your components like this
 
-``` 
+```rust
     cx.render(rsx! {
         div {
             Helmet {
