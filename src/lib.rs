@@ -29,24 +29,20 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
                     .collect();
                 let children = &*element.children;
 
-                let inner_text = if children.len() == 1 {
-                    match children[0] {
-                        VNode::Text(text) => {
-                            let text = text.text;
-                            format!("el.innerText = '{text}'")
-                        }
-                        VNode::Fragment(fragment) if fragment.children.len() == 1 => {
-                            if let VNode::Text(text) = fragment.children[0] {
-                                let text = text.text.replace("}\n", "} ").replace('\n', "");
-                                format!("el.innerHTML = '{text}'")
-                            } else {
-                                "".to_owned()
-                            }
-                        }
-                        _ => "".to_owned(),
+                let inner_text = match children.first() {
+                    Some(VNode::Text(text)) => {
+                        let text = text.text;
+                        format!("el.innerText = '{text}'")
                     }
-                } else {
-                    "".to_owned()
+                    Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
+                        if let VNode::Text(text) = fragment.children[0] {
+                            let text = text.text.replace("}\n", "} ").replace('\n', "");
+                            format!("el.innerHTML = '{text}'")
+                        } else {
+                            "".to_owned()
+                        }
+                    }
+                    _ => "".to_owned(),
                 };
 
                 eval(format!(
