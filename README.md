@@ -2,8 +2,6 @@
 
 Inspired by react-helmet, this small [Dioxus](https://github.com/DioxusLabs/dioxus) component allows you to place elements in the **head** of your code.
 
-Right now, this works only with the **master branch** of Dioxus.
-
 ## Configuration
 
 Add the package as a dependency to your `Cargo.toml`.

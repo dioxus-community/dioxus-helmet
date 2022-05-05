@@ -1,19 +1,17 @@
 [package]
 name = "dioxus-helmet"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dioxus = { git = "https://github.com/dioxuslabs/dioxus" }
+dioxus = "0.2.4"
 
 [dev-dependencies]
-
 # wasm-bindgen = "0.2.80"
 # wasm-bindgen-test = "0.3.30"
 # gloo-utils = "0.1.3"
-
 
 [features]
 default = ["web"]
