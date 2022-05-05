@@ -1,5 +1,12 @@
 # dioxus-helmet
 
+<a href="https://crates.io/crates/dioxus-helmet">
+  <img src="https://img.shields.io/crates/v/dioxus-helmet.svg?style=flat-square"
+  alt="Crates.io version" />
+</a>
+
+## General
+
 Inspired by react-helmet, this small [Dioxus](https://github.com/DioxusLabs/dioxus) component allows you to place elements in the **head** of your code.
 
 ## Configuration
