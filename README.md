@@ -8,7 +8,7 @@ Add the package as a dependency to your `Cargo.toml`.
 
 ### Web:
 ```rust
-dioxus-helmet = { version = "0.1.1" }
+dioxus-helmet = "0.1.1"
 ```
 
 ### ~~Desktop:~~ (doesn't work yet)
