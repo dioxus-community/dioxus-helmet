@@ -8,12 +8,12 @@ Add the package as a dependency to your `Cargo.toml`.
 
 ### Web:
 ```rust
-dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet" }
+dioxus-helmet = { version = "0.1.1" }
 ```
 
 ### ~~Desktop:~~ (doesn't work yet)
 ```rust
-dioxus-helmet = { git = "https://github.com/saicu/dioxus-helmet", default-features = false, features = ["desktop"] }
+dioxus-helmet = { version = "0.1.1", default-features = false, features = ["desktop"] }
 ```
 
 ## Usage
