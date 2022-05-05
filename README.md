@@ -26,26 +26,25 @@ use dioxus_helmet::Helmet;
 Then just use it anywhere in your components like this:
 
 ```rust
-    cx.render(rsx! {
-        div {
-            Helmet {
-                link { rel: "stylesheet", href: "/style.css" }
-                title { "Helmet" }
-                style {
-                    [r#"
-                        body {
-                            color: blue;
-                        }
-                        a {
-                            color: red;
-                        }
-                    "#]
-                }
-            },
-            p { "Hello, world!" }
-        }
-    })
-
+cx.render(rsx! {
+    div {
+        Helmet {
+            link { rel: "stylesheet", href: "/style.css" }
+            title { "Helmet" }
+            style {
+                [r#"
+                    body {
+                        color: blue;
+                    }
+                    a {
+                        color: red;
+                    }
+                "#]
+            }
+        },
+        p { "Hello, world!" }
+    }
+})
 ```
 
 Any children passed to the helmet component will be placed in the `<head></head>` of your document.
