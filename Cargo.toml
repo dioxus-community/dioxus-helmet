@@ -8,6 +8,8 @@ license = "MIT"
 repository = "https://github.com/saicu/dioxus-helmet"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+doctest = false
 
 [dependencies]
 dioxus = "0.2.4"
