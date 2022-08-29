@@ -2,16 +2,11 @@
 //! Inspired by react-helmet, this small [Dioxus](https://crates.io/crates/dioxus) component allows you to place elements in the **head** of your code.
 //! ## Configuration
 //! Add the package as a dependency to your `Cargo.toml`.
-//! ### Web:
 //! ```no_run
-//! dioxus-helmet = "0.1.1"
-//! ```
-//! ### ~~Desktop:~~ (doesn't work yet)
-//! ```
-//! dioxus-helmet = { version = "0.1.1", default-features = false, features = ["desktop"] }
+//! dioxus-helmet = "0.1.3"
 //! ```
 //! ## Usage
-//! Import it in your code: 
+//! Import it in your code:
 //! ```
 //! use dioxus_helmet::Helmet;
 //! ```
@@ -48,57 +43,53 @@ pub struct HelmetProps<'a> {
 
 #[allow(non_snake_case)]
 pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
-    #[cfg(feature = "web")]
-    let eval = dioxus::web::use_eval(&cx);
+    let initialized = use_state(&cx, || false);
 
-    #[cfg(feature = "desktop")]
-    let eval = dioxus::desktop::use_eval(&cx);
+    if !*initialized.get() {
+        initialized.set(true);
 
-    if let Some(VNode::Fragment(fragment)) = &cx.props.children {
-        fragment.children.iter().for_each(|child| {
-            if let VNode::Element(element) = child {
-                let tag = element.tag;
-                let attributes: String = element
-                    .attributes
-                    .iter()
-                    .map(|attribute| {
-                        let name = attribute.name;
-                        let value = attribute.value;
-                        format!("el.setAttribute('{name}', '{value}');")
-                    })
-                    .collect();
-                let children = &*element.children;
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(head) = document.head() {
+                    if let Some(VNode::Fragment(fragment)) = &cx.props.children {
+                        fragment.children.iter().for_each(|child| {
+                            if let VNode::Element(element) = child {
+                                if let Ok(new_element) = document.create_element(element.tag) {
+                                    element.attributes.iter().for_each(|attribute| {
+                                        let name = attribute.name;
+                                        let value = attribute.value;
+                                        let _ = new_element.set_attribute(name, value);
+                                    });
 
-                let inner_text = match children.first() {
-                    Some(VNode::Text(text)) => {
-                        let text = text.text;
-                        format!("el.innerText = '{text}'")
-                    }
-                    Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => fragment
-                        .children
-                        .first()
-                        .and_then(|child| {
-                            if let VNode::Text(text) = child {
-                                let text = text.text.replace("}\n", "} ").replace('\n', "");
-                                Some(format!("el.innerHTML = '{text}'"))
-                            } else {
-                                None
+                                    match element.children.first() {
+                                        Some(VNode::Text(text)) => {
+                                            new_element.set_text_content(Some(text.text));
+                                        }
+                                        Some(VNode::Fragment(fragment))
+                                            if fragment.children.len() == 1 =>
+                                        {
+                                            if let Some(VNode::Text(text)) =
+                                                fragment.children.first()
+                                            {
+                                                let inner = text
+                                                    .text
+                                                    .replace("}\n", "} ")
+                                                    .replace('\n', "");
+
+                                                new_element.set_inner_html(&inner);
+                                            };
+                                        }
+                                        _ => {}
+                                    };
+
+                                    let _ = head.append_child(&new_element);
+                                }
                             }
-                        })
-                        .unwrap_or_default(),
-                    _ => "".to_owned(),
-                };
-
-                eval(format!(
-                    r#"
-                        let el = document.createElement('{tag}')
-                        {attributes}
-                        {inner_text}
-                        document.head.appendChild(el)
-                    "#
-                ));
+                        });
+                    }
+                }
             }
-        });
+        }
     }
 
     None
