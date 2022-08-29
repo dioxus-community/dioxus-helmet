@@ -13,14 +13,8 @@ Inspired by react-helmet, this small [Dioxus](https://github.com/DioxusLabs/diox
 
 Add the package as a dependency to your `Cargo.toml`.
 
-### Web:
 ```rust
-dioxus-helmet = "0.1.1"
-```
-
-### ~~Desktop:~~ (doesn't work yet)
-```rust
-dioxus-helmet = { version = "0.1.1", default-features = false, features = ["desktop"] }
+dioxus-helmet = "0.1.3"
 ```
 
 ## Usage
