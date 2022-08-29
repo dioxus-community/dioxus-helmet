@@ -36,6 +36,9 @@
 //! ```
 //! Any children passed to the helmet component will be placed in the `<head></head>` of your document.
 
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
 use dioxus::prelude::*;
 
 #[derive(Props)]
@@ -43,18 +46,50 @@ pub struct HelmetProps<'a> {
     children: Element<'a>,
 }
 
+lazy_static! {
+    static ref INIT_CACHE: Mutex<Vec<ElementMap>> = Mutex::new(Vec::new());
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ElementMap {
+    tag: String,
+    attributes: Vec<(String, String)>,
+    inner_html: Option<String>,
+}
+
+impl ElementMap {
+    fn try_into_element(&self, document: &web_sys::Document) -> Option<web_sys::Element> {
+        if let Ok(new_element) = document.create_element(&self.tag) {
+            self.attributes.iter().for_each(|(name, value)| {
+                let _ = new_element.set_attribute(name, value);
+            });
+
+            if let Some(inner_html) = &self.inner_html {
+                new_element.set_inner_html(inner_html);
+            }
+
+            return Some(new_element);
+        }
+        None
+    }
+}
+
 #[allow(non_snake_case)]
 pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
-    let initialized = use_state(&cx, || false);
+    if let Some(window) = web_sys::window() {
+        if let Some(document) = window.document() {
+            if let Some(head) = document.head() {
+                if let Some(element_maps) = extract_element_maps(&cx.props.children) {
+                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
+                        element_maps.iter().for_each(|element_map| {
+                            if !init_cache.contains(element_map) {
+                                init_cache.push(element_map.clone());
 
-    if !*initialized.get() {
-        initialized.set(true);
-
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(head) = document.head() {
-                    if let Some(elements) = extract_elements(&document, &cx.props.children) {
-                        create_elements(&head, &elements);
+                                if let Some(new_element) = element_map.try_into_element(&document) {
+                                    let _ = head.append_child(&new_element);
+                                }
+                            }
+                        });
                     }
                 }
             }
@@ -64,37 +99,36 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
     None
 }
 
-fn extract_elements<'a>(
-    document: &web_sys::Document,
-    children: &Element<'a>,
-) -> Option<Vec<web_sys::Element>> {
+fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
     if let Some(VNode::Fragment(fragment)) = &children {
         let elements = fragment
             .children
             .iter()
             .flat_map(|child| {
                 if let VNode::Element(element) = child {
-                    if let Ok(new_element) = document.create_element(element.tag) {
-                        element.attributes.iter().for_each(|attribute| {
-                            let _ = new_element.set_attribute(attribute.name, attribute.value);
-                        });
+                    let attributes = element
+                        .attributes
+                        .iter()
+                        .map(|attribute| (attribute.name.to_owned(), attribute.value.to_owned()))
+                        .collect();
 
-                        match element.children.first() {
-                            Some(VNode::Text(text)) => {
-                                new_element.set_text_content(Some(text.text));
+                    let inner_html = match element.children.first() {
+                        Some(VNode::Text(vtext)) => Some(vtext.text.to_owned()),
+                        Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
+                            if let Some(VNode::Text(vtext)) = fragment.children.first() {
+                                Some(vtext.text.replace("}\n", "} ").replace('\n', ""))
+                            } else {
+                                None
                             }
-                            Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
-                                if let Some(VNode::Text(text)) = fragment.children.first() {
-                                    let inner = text.text.replace("}\n", "} ").replace('\n', "");
+                        }
+                        _ => None,
+                    };
 
-                                    new_element.set_inner_html(&inner);
-                                };
-                            }
-                            _ => {}
-                        };
-
-                        return Some(new_element);
-                    }
+                    return Some(ElementMap {
+                        tag: element.tag.to_owned(),
+                        attributes,
+                        inner_html,
+                    });
                 }
 
                 None
@@ -105,10 +139,4 @@ fn extract_elements<'a>(
     }
 
     None
-}
-
-fn create_elements(head: &web_sys::HtmlHeadElement, elements: &[web_sys::Element]) {
-    elements.iter().for_each(|element| {
-        let _ = head.append_child(element);
-    });
 }
