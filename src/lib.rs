@@ -35,43 +35,24 @@
 //! })
 //! ```
 //! Any children passed to the helmet component will be placed in the `<head></head>` of your document.
-
-use lazy_static::lazy_static;
-use std::sync::Mutex;
+//!
+//! They will be only added **once on the first render**. Duplicates also **won't** get appended twice.
 
 use dioxus::prelude::*;
+use fxhash::FxHasher;
+use lazy_static::lazy_static;
+use std::{
+    hash::{Hash, Hasher},
+    sync::Mutex,
+};
+
+lazy_static! {
+    static ref INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+}
 
 #[derive(Props)]
 pub struct HelmetProps<'a> {
     children: Element<'a>,
-}
-
-lazy_static! {
-    static ref INIT_CACHE: Mutex<Vec<ElementMap>> = Mutex::new(Vec::new());
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ElementMap {
-    tag: String,
-    attributes: Vec<(String, String)>,
-    inner_html: Option<String>,
-}
-
-impl ElementMap {
-    fn try_into_element(&self, document: &web_sys::Document) -> Option<web_sys::Element> {
-        if let Ok(new_element) = document.create_element(&self.tag) {
-            self.attributes.iter().for_each(|(name, value)| {
-                let _ = new_element.set_attribute(name, value);
-            });
-
-            if let Some(inner_html) = &self.inner_html {
-                new_element.set_inner_html(inner_html);
-            }
-
-            return Some(new_element);
-        }
-        None
-    }
 }
 
 #[allow(non_snake_case)]
@@ -82,8 +63,12 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
                 if let Some(element_maps) = extract_element_maps(&cx.props.children) {
                     if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
                         element_maps.iter().for_each(|element_map| {
-                            if !init_cache.contains(element_map) {
-                                init_cache.push(element_map.clone());
+                            let mut hasher = FxHasher::default();
+                            element_map.hash(&mut hasher);
+                            let hash = hasher.finish();
+
+                            if !init_cache.contains(&hash) {
+                                init_cache.push(hash);
 
                                 if let Some(new_element) = element_map.try_into_element(&document) {
                                     let _ = head.append_child(&new_element);
@@ -99,7 +84,31 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
     None
 }
 
-fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
+#[derive(Debug, Hash)]
+struct ElementMap<'a> {
+    tag: &'a str,
+    attributes: Vec<(&'a str, &'a str)>,
+    inner_html: Option<&'a str>,
+}
+
+impl<'a> ElementMap<'a> {
+    fn try_into_element(&self, document: &web_sys::Document) -> Option<web_sys::Element> {
+        if let Ok(new_element) = document.create_element(self.tag) {
+            self.attributes.iter().for_each(|(name, value)| {
+                let _ = new_element.set_attribute(name, value);
+            });
+
+            if let Some(inner_html) = &self.inner_html {
+                new_element.set_inner_html(inner_html);
+            }
+
+            return Some(new_element);
+        }
+        None
+    }
+}
+
+fn extract_element_maps<'a>(children: &'a Element) -> Option<Vec<ElementMap<'a>>> {
     if let Some(VNode::Fragment(fragment)) = &children {
         let elements = fragment
             .children
@@ -109,14 +118,14 @@ fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
                     let attributes = element
                         .attributes
                         .iter()
-                        .map(|attribute| (attribute.name.to_owned(), attribute.value.to_owned()))
+                        .map(|attribute| (attribute.name, attribute.value))
                         .collect();
 
                     let inner_html = match element.children.first() {
-                        Some(VNode::Text(vtext)) => Some(vtext.text.to_owned()),
+                        Some(VNode::Text(vtext)) => Some(vtext.text),
                         Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
                             if let Some(VNode::Text(vtext)) = fragment.children.first() {
-                                Some(vtext.text.replace("}\n", "} ").replace('\n', ""))
+                                Some(vtext.text)
                             } else {
                                 None
                             }
@@ -125,7 +134,7 @@ fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
                     };
 
                     return Some(ElementMap {
-                        tag: element.tag.to_owned(),
+                        tag: element.tag,
                         attributes,
                         inner_html,
                     });
