@@ -98,13 +98,14 @@ impl<'a> ElementMap<'a> {
                 let _ = new_element.set_attribute(name, value);
             });
 
-            if let Some(inner_html) = &self.inner_html {
+            if let Some(inner_html) = self.inner_html {
                 new_element.set_inner_html(inner_html);
             }
 
-            return Some(new_element);
+            Some(new_element)
+        } else {
+            None
         }
-        None
     }
 }
 
@@ -133,19 +134,19 @@ fn extract_element_maps<'a>(children: &'a Element) -> Option<Vec<ElementMap<'a>>
                         _ => None,
                     };
 
-                    return Some(ElementMap {
+                    Some(ElementMap {
                         tag: element.tag,
                         attributes,
                         inner_html,
-                    });
+                    })
+                } else {
+                    None
                 }
-
-                None
             })
             .collect();
 
-        return Some(elements);
+        Some(elements)
+    } else {
+        None
     }
-
-    None
 }
