@@ -1,10 +1,12 @@
 //! ## General
 //! Inspired by react-helmet, this small [Dioxus](https://crates.io/crates/dioxus) component allows you to place elements in the **head** of your code.
+//!
 //! ## Configuration
 //! Add the package as a dependency to your `Cargo.toml`.
 //! ```no_run
-//! dioxus-helmet = "0.1.3"
+//! cargo add dioxus-helmet
 //! ```
+//!
 //! ## Usage
 //! Import it in your code:
 //! ```
@@ -51,10 +53,8 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
         if let Some(window) = web_sys::window() {
             if let Some(document) = window.document() {
                 if let Some(head) = document.head() {
-                    if let Some(new_children) = extract_elements(&document, &cx.props.children) {
-                        new_children.iter().for_each(|child| {
-                            let _ = head.append_child(child);
-                        });
+                    if let Some(elements) = extract_elements(&document, &cx.props.children) {
+                        create_elements(&head, &elements);
                     }
                 }
             }
@@ -76,9 +76,7 @@ fn extract_elements<'a>(
                 if let VNode::Element(element) = child {
                     if let Ok(new_element) = document.create_element(element.tag) {
                         element.attributes.iter().for_each(|attribute| {
-                            let name = attribute.name;
-                            let value = attribute.value;
-                            let _ = new_element.set_attribute(name, value);
+                            let _ = new_element.set_attribute(attribute.name, attribute.value);
                         });
 
                         match element.children.first() {
@@ -98,6 +96,7 @@ fn extract_elements<'a>(
                         return Some(new_element);
                     }
                 }
+
                 None
             })
             .collect();
@@ -106,4 +105,10 @@ fn extract_elements<'a>(
     }
 
     None
+}
+
+fn create_elements(head: &web_sys::HtmlHeadElement, elements: &[web_sys::Element]) {
+    elements.iter().for_each(|element| {
+        let _ = head.append_child(element);
+    });
 }
