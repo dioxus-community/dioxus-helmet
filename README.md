@@ -50,7 +50,7 @@ cx.render(rsx! {
 
 Any children passed to the helmet component will be placed in the `<head></head>` of your document.
 
-They will be only added **once on the first render**. Duplicates also **won't** get appended twice.
+They will be removed together with the containing component. Duplicates **won't** get appended multiple times.
 
 ## License
 

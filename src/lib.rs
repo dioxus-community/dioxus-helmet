@@ -36,7 +36,7 @@
 //! ```
 //! Any children passed to the helmet component will be placed in the `<head></head>` of your document.
 //!
-//! They will be only added **once on the first render**. Duplicates also **won't** get appended twice.
+//! They will be removed together with the containing component. Duplicates **won't** get appended multiple times.
 
 use dioxus::prelude::*;
 use fxhash::FxHasher;
@@ -70,7 +70,9 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
                             if !init_cache.contains(&hash) {
                                 init_cache.push(hash);
 
-                                if let Some(new_element) = element_map.try_into_element(&document) {
+                                if let Some(new_element) =
+                                    element_map.try_into_element(&document, &hash)
+                                {
                                     let _ = head.append_child(&new_element);
                                 }
                             }
@@ -84,6 +86,41 @@ pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
     None
 }
 
+impl Drop for HelmetProps<'_> {
+    fn drop(&mut self) {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(element_maps) = extract_element_maps(&self.children) {
+                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
+                        element_maps.iter().for_each(|element_map| {
+                            let mut hasher = FxHasher::default();
+                            element_map.hash(&mut hasher);
+                            let hash = hasher.finish();
+
+                            if let Some(index) = init_cache.iter().position(|&c| c == hash) {
+                                init_cache.remove(index);
+                            }
+
+                            if let Ok(children) =
+                                document.query_selector_all(&format!("[data-helmet-id='{hash}']"))
+                            {
+                                if let Ok(Some(children_iter)) = js_sys::try_iter(&children) {
+                                    children_iter.for_each(|child| {
+                                        if let Ok(child) = child {
+                                            let el = web_sys::Element::from(child);
+                                            el.remove();
+                                        };
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Hash)]
 struct ElementMap<'a> {
     tag: &'a str,
@@ -92,11 +129,16 @@ struct ElementMap<'a> {
 }
 
 impl<'a> ElementMap<'a> {
-    fn try_into_element(&self, document: &web_sys::Document) -> Option<web_sys::Element> {
+    fn try_into_element(
+        &self,
+        document: &web_sys::Document,
+        hash: &u64,
+    ) -> Option<web_sys::Element> {
         if let Ok(new_element) = document.create_element(self.tag) {
             self.attributes.iter().for_each(|(name, value)| {
                 let _ = new_element.set_attribute(name, value);
             });
+            let _ = new_element.set_attribute("data-helmet-id", &hash.to_string());
 
             if let Some(inner_html) = self.inner_html {
                 new_element.set_inner_html(inner_html);
