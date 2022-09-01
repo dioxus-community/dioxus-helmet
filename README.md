@@ -24,13 +24,14 @@ Import it in your code:
 use dioxus_helmet::Helmet;
 ```
 
-Then just use it anywhere in your components like this:
+Then use it as a component like this:
 
 ```rust
-cx.render(rsx! {
-    div {
+#[inline_props]
+fn HeadElements(cx: Scope, path: String) -> Element {
+    cx.render(rsx! {
         Helmet {
-            link { rel: "stylesheet", href: "/style.css" }
+            link { rel: "icon", href: "{path}"}
             title { "Helmet" }
             style {
                 [r#"
@@ -42,15 +43,18 @@ cx.render(rsx! {
                     }
                 "#]
             }
-        },
-        p { "Hello, world!" }
-    }
-})
+        }
+    })
+}
 ```
 
-Any children passed to the helmet component will be placed in the `<head></head>` of your document.
+Reach your dynamic values down as owned properties (eg `String` and **not** `&'a str`).
 
-They will be removed together with the containing component. Duplicates **won't** get appended multiple times.
+Also make sure that there are **no states** in your component where you use Helmet.
+
+Any children passed to the helmet component will then be placed in the `<head></head>` of your document.
+
+They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
 ## License
 
