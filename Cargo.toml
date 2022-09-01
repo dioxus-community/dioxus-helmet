@@ -1,6 +1,6 @@
 [package]
 name = "dioxus-helmet"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Saicu"]
 edition = "2021"
 description = "Small Dioxus component which allows you to place elements in the head of your document"
