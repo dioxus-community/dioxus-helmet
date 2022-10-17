@@ -19,7 +19,7 @@ cargo add dioxus-helmet
 
 ## Usage
 
-Import it in your code: 
+Import it in your code:
 ```rust
 use dioxus_helmet::Helmet;
 ```

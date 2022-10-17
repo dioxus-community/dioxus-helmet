@@ -12,9 +12,9 @@
 //! ```
 //! use dioxus_helmet::Helmet;
 //! ```
-//! 
+//!
 //! Then use it as a component like this:
-//! 
+//!
 //! ```rust
 //! #[inline_props]
 //! fn HeadElements(cx: Scope, path: String) -> Element {
@@ -36,18 +36,18 @@
 //!     })
 //! }
 //! ```
-//! 
+//!
 //! Reach your dynamic values down as owned properties (eg `String` and **not** `&'a str`).
-//! 
+//!
 //! Also make sure that there are **no states** in your component where you use Helmet.
-//! 
+//!
 //! Any children passed to the helmet component will then be placed in the `<head></head>` of your document.
-//! 
+//!
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
 use dioxus::prelude::*;
-use fxhash::FxHasher;
 use lazy_static::lazy_static;
+use rustc_hash::FxHasher;
 use std::{
     hash::{Hash, Hasher},
     sync::Mutex,
@@ -168,7 +168,9 @@ fn extract_element_maps<'a>(children: &'a Element) -> Option<Vec<ElementMap<'a>>
                     let attributes = element
                         .attributes
                         .iter()
-                        .map(|attribute| (attribute.name, attribute.value))
+                        .map(|attribute| {
+                            (attribute.attribute.name, attribute.value.as_text().unwrap())
+                        })
                         .collect();
 
                     let inner_html = match element.children.first() {
