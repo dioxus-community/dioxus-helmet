@@ -1,11 +1,11 @@
 [package]
 name = "dioxus-helmet"
-version = "0.2.4"
+version = "0.3.0"
 authors = ["Saicu", "painedpineapple"]
 edition = "2021"
 description = "Small Dioxus component which allows you to place elements in the head of your document"
 license = "MIT"
-repository = "https://github.com/saicu/dioxus-helmet"
+repository = "https://github.com/ranger-finance/dioxus-helmet"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
