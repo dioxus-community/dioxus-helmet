@@ -1,7 +1,7 @@
 [package]
 name = "dioxus-helmet"
 version = "0.2.4"
-authors = ["Saicu"]
+authors = ["Saicu", "painedpineapple"]
 edition = "2021"
 description = "Small Dioxus component which allows you to place elements in the head of your document"
 license = "MIT"
@@ -12,7 +12,7 @@ repository = "https://github.com/saicu/dioxus-helmet"
 doctest = false
 
 [dependencies]
-dioxus = { git = "https://github.com/DioxusLabs/dioxus" }
+dioxus = { version = "0.5.1" }
 web-sys = { version = "0.3.59", features = ["Document", "Window", "Element", "HtmlHeadElement", "HtmlCollection", "NamedNodeMap", "NodeList"] }
 lazy_static = "1.4.0"
 rustc-hash = "1.1.0"

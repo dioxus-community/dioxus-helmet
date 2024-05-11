@@ -20,6 +20,7 @@ cargo add dioxus-helmet
 ## Usage
 
 Import it in your code:
+
 ```rust
 use dioxus_helmet::Helmet;
 ```
@@ -27,24 +28,24 @@ use dioxus_helmet::Helmet;
 Then use it as a component like this:
 
 ```rust
-#[inline_props]
-fn HeadElements(cx: Scope, path: String) -> Element {
-    cx.render(rsx! {
+#[component]
+fn HeadElements() -> Element {
+    rsx! {
         Helmet {
             link { rel: "icon", href: "{path}"}
             title { "Helmet" }
             style {
-                [r#"
-                    body {
-                        color: blue;
-                    }
-                    a {
-                        color: red;
-                    }
-                "#]
+                r"
+                      body {{
+                          font-size: 22px;
+                          margin: 0;
+                          color: white;
+                          text-align: center;
+                      }}
+                  "
             }
         }
-    })
+    }
 }
 ```
 
