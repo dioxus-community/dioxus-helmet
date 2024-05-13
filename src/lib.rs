@@ -4,7 +4,7 @@
 //! ## Configuration
 //! Add the package as a dependency to your `Cargo.toml`.
 //! ```no_run
-//! cargo add dioxus-dioxus-helmet
+//! cargo add dioxus-helmet
 //! ```
 //!
 //! ## Usage
@@ -41,7 +41,7 @@
 //!
 //! Also make sure that there are **no states** in your component where you use Helmet.
 //!
-//! Any children passed to the dioxus-helmet component will then be placed in the `<head></head>` of your document.
+//! Any children passed to the `Helmet` component will then be placed in the `<head></head>` of your document.
 //!
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
@@ -57,12 +57,16 @@ lazy_static! {
     static ref INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 }
 
-#[component]
-pub fn Helmet(children: Element) -> Element {
+#[derive(Props, Clone, PartialEq)]
+pub struct HelmetProps {
+    children: Element,
+}
+
+pub fn Helmet(props: HelmetProps) -> Element {
     if let Some(window) = web_sys::window() {
         if let Some(document) = window.document() {
             if let Some(head) = document.head() {
-                if let Some(element_maps) = extract_element_maps(&children) {
+                if let Some(element_maps) = extract_element_maps(&props.children) {
                     if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
                         element_maps.iter().for_each(|element_map| {
                             let mut hasher = FxHasher::default();
