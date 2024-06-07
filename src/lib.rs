@@ -44,8 +44,10 @@
 //! Any children passed to the `Helmet` component will then be placed in the `<head></head>` of your document.
 //!
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
+#![allow(non_snake_case)]
 
 use dioxus::prelude::*;
+use dioxus_core::AttributeValue;
 use lazy_static::lazy_static;
 use rustc_hash::FxHasher;
 use std::{
@@ -63,31 +65,33 @@ pub struct HelmetProps {
 }
 
 pub fn Helmet(props: HelmetProps) -> Element {
-    if let Some(window) = web_sys::window() {
-        if let Some(document) = window.document() {
-            if let Some(head) = document.head() {
-                if let Some(element_maps) = extract_element_maps(&props.children) {
-                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
-                        element_maps.iter().for_each(|element_map| {
-                            let mut hasher = FxHasher::default();
-                            element_map.hash(&mut hasher);
-                            let hash = hasher.finish();
+    use_effect(move || {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(head) = document.head() {
+                    if let Some(element_maps) = extract_element_maps(&props.children) {
+                        if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
+                            element_maps.iter().for_each(|element_map| {
+                                let mut hasher = FxHasher::default();
+                                element_map.hash(&mut hasher);
+                                let hash = hasher.finish();
 
-                            if !init_cache.contains(&hash) {
-                                init_cache.push(hash);
+                                if !init_cache.contains(&hash) {
+                                    init_cache.push(hash);
 
-                                if let Some(new_element) =
-                                    element_map.try_into_element(&document, &hash)
-                                {
-                                    let _ = head.append_child(&new_element);
+                                    if let Some(new_element) =
+                                        element_map.try_into_element(&document, &hash)
+                                    {
+                                        let _ = head.append_child(&new_element);
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
                     }
                 }
             }
         }
-    }
+    });
 
     None
 }
@@ -95,7 +99,7 @@ pub fn Helmet(props: HelmetProps) -> Element {
 #[derive(Debug, Hash)]
 struct ElementMap<'a> {
     tag: &'a str,
-    attributes: Vec<(&'a str, &'a str)>,
+    attributes: Vec<(&'a str, String)>,
     inner_html: Option<&'a str>,
 }
 
@@ -129,7 +133,7 @@ fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
             .get()
             .roots
             .iter()
-            .flat_map(|root| {
+            .flat_map(|root: &TemplateNode| {
                 if let TemplateNode::Element {
                     tag,
                     attrs,
@@ -137,16 +141,43 @@ fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
                     ..
                 } = root
                 {
-                    let attributes = attrs
+                    let mut attributes: Vec<(&str, String)> = vnode
+                        .dynamic_attrs
+                        .iter()
+                        .flat_map(|attrs| {
+                            attrs
+                                .iter()
+                                .filter_map(|attr| match &attr.value {
+                                    AttributeValue::None => None,
+                                    AttributeValue::Listener(_) => None,
+                                    AttributeValue::Any(_) => None,
+                                    AttributeValue::Bool(value) => {
+                                        Some((attr.name, value.to_string()))
+                                    }
+                                    AttributeValue::Float(value) => {
+                                        Some((attr.name, value.to_string()))
+                                    }
+                                    AttributeValue::Int(value) => {
+                                        Some((attr.name, value.to_string()))
+                                    }
+                                    AttributeValue::Text(value) => Some((attr.name, value.clone())),
+                                })
+                                .collect::<Vec<(&str, String)>>()
+                        })
+                        .collect::<Vec<(&str, String)>>();
+
+                    let mut template_attributes: Vec<(&str, String)> = attrs
                         .iter()
                         .flat_map(|attribute| {
                             if let TemplateAttribute::Static { name, value, .. } = attribute {
-                                Some((*name, *value))
+                                Some((*name, value.to_string()))
                             } else {
                                 None
                             }
                         })
                         .collect();
+
+                    attributes.append(&mut template_attributes);
 
                     let inner_html = match children.first() {
                         Some(TemplateNode::Text { text }) => Some(*text),
