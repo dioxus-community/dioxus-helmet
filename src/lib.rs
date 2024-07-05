@@ -9,16 +9,16 @@
 //!
 //! ## Usage
 //! Import it in your code:
-//! ```
+//! ```rust
 //! use dioxus_helmet::Helmet;
 //! ```
 //!
 //! Then use it as a component like this:
 //!
 //! ```rust
-//! #[inline_props]
-//! fn HeadElements(cx: Scope, path: String) -> Element {
-//!     cx.render(rsx! {
+//! #[component]
+//! fn HeadElements(path: String) -> Element {
+//!     rsx! {
 //!         Helmet {
 //!             link { rel: "icon", href: "{path}"}
 //!             title { "Helmet" }
@@ -33,17 +33,19 @@
 //!                 "#]
 //!             }
 //!         }
-//!     })
+//!     }
 //! }
 //! ```
 //!
-//! Reach your dynamic values down as owned properties (eg `String` and **not** `&'a str`).
+//! Any children passed to the `Helmet` component will then be placed in the `<head></head>` of your document.
 //!
-//! Also make sure that there are **no states** in your component where you use Helmet.
-//!
-//! Any children passed to the helmet component will then be placed in the `<head></head>` of your document.
+//! **IMPORTANT**: The nodes inside the `Helmet` component are not reactive, so they won't be updated
+//! when the value of them changes. So it's better to use static values inside the `Helmet`
+//! component instead of signals.
 //!
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
+
+#![allow(non_snake_case)]
 
 use dioxus::prelude::*;
 use dioxus_core::AttributeValue;
@@ -53,13 +55,21 @@ use std::sync::Mutex;
 
 static INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 
-#[allow(non_snake_case)]
-#[component]
-pub fn Helmet(children: Element) -> Element {
+/// Props to pass into the `Helmet` component.
+#[derive(PartialEq, Clone, Props)]
+pub struct HelmetProps {
+    /// Elements to be put in the head of your document.
+    pub children: Element,
+}
+
+/// The `Helmet` Dioxus component.
+///
+/// This component allows to place **non-rective** nodes in the head of your document.
+pub fn Helmet(props: HelmetProps) -> Element {
     use_hook_with_cleanup(move || {
         let document = web_sys::window()?.document()?;
         let head = document.head()?;
-        let mut element_maps = extract_element_maps(&children)?;
+        let mut element_maps = extract_element_maps(&props.children)?;
         let mut init_cache = INIT_CACHE.try_lock().ok()?;
 
         element_maps.iter_mut().for_each(|element_map| {

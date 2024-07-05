@@ -1,11 +1,11 @@
 [package]
 name = "dioxus-helmet"
-version = "0.2.4"
+version = "0.5.1"
 authors = ["Saicu"]
 edition = "2021"
 description = "Small Dioxus component which allows you to place elements in the head of your document"
 license = "MIT"
-repository = "https://github.com/saicu/dioxus-helmet"
+repository = "https://github.com/dioxus-community/dioxus-helmet"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -14,4 +14,4 @@ doctest = false
 [dependencies]
 dioxus = { version = "0.5.1" }
 web-sys = { version = "0.3.69", features = ["Document", "Window", "Element", "HtmlHeadElement"] }
-rustc-hash = "1.1.0"
+rustc-hash = "2.0.0"
