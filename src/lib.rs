@@ -46,158 +46,148 @@
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
 use dioxus::prelude::*;
+use dioxus_core::AttributeValue;
 use lazy_static::lazy_static;
 use rustc_hash::FxHasher;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Mutex,
-};
+use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
 
 lazy_static! {
     static ref INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 }
 
-#[derive(Props)]
-pub struct HelmetProps<'a> {
-    children: Element<'a>,
-}
-
 #[allow(non_snake_case)]
-pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
-    if let Some(window) = web_sys::window() {
-        if let Some(document) = window.document() {
-            if let Some(head) = document.head() {
-                if let Some(element_maps) = extract_element_maps(&cx.props.children) {
-                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
-                        element_maps.iter().for_each(|element_map| {
-                            let mut hasher = FxHasher::default();
-                            element_map.hash(&mut hasher);
-                            let hash = hasher.finish();
+#[component]
+pub fn Helmet(children: Element) -> Element {
+    use_hook_with_cleanup(move || {
+        let document = web_sys::window()?.document()?;
+        let head = document.head()?;
+        let element_maps = extract_element_maps(&children)?;
+        let mut init_cache = INIT_CACHE.try_lock().ok()?;
 
-                            if !init_cache.contains(&hash) {
-                                init_cache.push(hash);
+        element_maps.iter().for_each(|element_map| {
+            let mut hasher = FxHasher::default();
+            element_map.hash(&mut hasher);
+            let hash = hasher.finish();
 
-                                if let Some(new_element) =
-                                    element_map.try_into_element(&document, &hash)
-                                {
-                                    let _ = head.append_child(&new_element);
-                                }
-                            }
-                        });
-                    }
+            if init_cache.contains(&hash) { return; }
+            init_cache.push(hash);
+
+            if let Some(new_element) = element_map.try_into_element(&document, &hash) {
+                let _ = head.append_child(&new_element);
+            }
+        });
+
+        Some(element_maps)
+    },
+    move |element_maps| {
+        let Some(element_maps) = element_maps else { return; };
+        let Some(window) = web_sys::window() else { return; };
+        let Some(document) = window.document() else { return; };
+        let Ok(mut init_cache) = INIT_CACHE.try_lock() else { return; };
+
+        element_maps.iter().for_each(|element_map| {
+            let mut hasher = FxHasher::default();
+            element_map.hash(&mut hasher);
+            let hash = hasher.finish();
+
+            if let Some(index) = init_cache.iter().position(|&c| c == hash) {
+                init_cache.remove(index);
+            }
+
+            if let Ok(children) =
+            document.query_selector_all(&format!("[data-helmet-id='{hash}']"))
+            {
+                if let Ok(Some(children_iter)) = js_sys::try_iter(&children) {
+                    children_iter.for_each(|child| {
+                        if let Ok(child) = child {
+                            let el = web_sys::Element::from(child);
+                            el.remove();
+                        };
+                    });
                 }
             }
-        }
-    }
+        });
+    });
 
     None
 }
 
-impl Drop for HelmetProps<'_> {
-    fn drop(&mut self) {
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(element_maps) = extract_element_maps(&self.children) {
-                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
-                        element_maps.iter().for_each(|element_map| {
-                            let mut hasher = FxHasher::default();
-                            element_map.hash(&mut hasher);
-                            let hash = hasher.finish();
-
-                            if let Some(index) = init_cache.iter().position(|&c| c == hash) {
-                                init_cache.remove(index);
-                            }
-
-                            if let Ok(children) =
-                                document.query_selector_all(&format!("[data-helmet-id='{hash}']"))
-                            {
-                                if let Ok(Some(children_iter)) = js_sys::try_iter(&children) {
-                                    children_iter.for_each(|child| {
-                                        if let Ok(child) = child {
-                                            let el = web_sys::Element::from(child);
-                                            el.remove();
-                                        };
-                                    });
-                                }
-                            }
-                        });
-                    }
-                }
-            }
-        }
-    }
+#[derive(Debug, Hash, Clone)]
+struct ElementMap {
+    tag: &'static str,
+    attributes: Vec<(&'static str, String)>,
+    inner_html: Option<&'static str>,
 }
 
-#[derive(Debug, Hash)]
-struct ElementMap<'a> {
-    tag: &'a str,
-    attributes: Vec<(&'a str, &'a str)>,
-    inner_html: Option<&'a str>,
-}
-
-impl<'a> ElementMap<'a> {
+impl ElementMap {
     fn try_into_element(
         &self,
         document: &web_sys::Document,
         hash: &u64,
     ) -> Option<web_sys::Element> {
-        if let Ok(new_element) = document.create_element(self.tag) {
-            self.attributes.iter().for_each(|(name, value)| {
-                let _ = new_element.set_attribute(name, value);
-            });
-            let _ = new_element.set_attribute("data-helmet-id", &hash.to_string());
+        let new_element = document.create_element(self.tag).ok()?;
 
-            if let Some(inner_html) = self.inner_html {
-                new_element.set_inner_html(inner_html);
-            }
+        self.attributes.iter().try_for_each(|(name, value)| {
+            new_element.set_attribute(name, value)
+        }).ok()?;
+        new_element.set_attribute("data-helmet-id", &hash.to_string()).ok()?;
 
-            Some(new_element)
-        } else {
-            None
+        if let Some(inner_html) = self.inner_html {
+            new_element.set_inner_html(inner_html);
         }
+
+        Some(new_element)
     }
 }
 
-fn extract_element_maps<'a>(children: &'a Element) -> Option<Vec<ElementMap<'a>>> {
-    if let Some(VNode::Fragment(fragment)) = &children {
-        let elements = fragment
-            .children
-            .iter()
-            .flat_map(|child| {
-                if let VNode::Element(element) = child {
-                    let attributes = element
-                        .attributes
-                        .iter()
-                        .map(|attribute| {
-                            (attribute.attribute.name, attribute.value.as_text().unwrap())
-                        })
-                        .collect();
+fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
+    use AttributeValue as AV;
+    use TemplateAttribute as TA;
+    use TemplateNode as TN;
 
-                    let inner_html = match element.children.first() {
-                        Some(VNode::Text(vtext)) => Some(vtext.text),
-                        Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
-                            if let Some(VNode::Text(vtext)) = fragment.children.first() {
-                                Some(vtext.text)
-                            } else {
-                                None
-                            }
+    let vnode = children.as_ref()?;
+    let template = vnode.template.get();
+
+    let elements = template.roots.iter()
+        .filter_map(|root| {
+            let TN::Element { tag, attrs, children, .. } = root else {
+                return None;
+            };
+
+            let mut attributes = vec![];
+            attrs.iter()
+                .for_each(|attr| match attr {
+                    TA::Static { name, value, .. } => attributes.push((*name, value.to_string())),
+                    TA::Dynamic { id } => vnode.dynamic_attrs[*id].iter().for_each(|attr| {
+                        match &attr.value {
+                            AV::Bool(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Float(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Int(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Text(v) => attributes.push((attr.name, v.to_string())),
+                            AV::None | AV::Listener(_) | AV::Any(_) => {}
                         }
-                        _ => None,
-                    };
-
-                    Some(ElementMap {
-                        tag: element.tag,
-                        attributes,
-                        inner_html,
                     })
-                } else {
-                    None
-                }
-            })
-            .collect();
+                });
 
-        Some(elements)
-    } else {
-        None
-    }
+            let inner_html = match children.first() {
+                Some(TN::Text { text }) => Some(*text),
+                Some(TN::Element { children, .. }) if children.len() == 1 => {
+                    match children.first() {
+                        Some(TN::Text { text }) => Some(*text),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+
+            Some(ElementMap {
+                tag,
+                attributes,
+                inner_html
+            })
+        })
+        .collect();
+
+    Some(elements)
 }
