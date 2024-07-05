@@ -47,14 +47,11 @@
 
 use dioxus::prelude::*;
 use dioxus_core::AttributeValue;
-use lazy_static::lazy_static;
 use rustc_hash::FxHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
 
-lazy_static! {
-    static ref INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
-}
+static INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 
 #[allow(non_snake_case)]
 #[component]
