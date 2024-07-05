@@ -27,9 +27,9 @@ use dioxus_helmet::Helmet;
 Then use it as a component like this:
 
 ```rust
-#[inline_props]
-fn HeadElements(cx: Scope, path: String) -> Element {
-    cx.render(rsx! {
+#[component]
+fn HeadElements(path: String) -> Element {
+    rsx! {
         Helmet {
             link { rel: "icon", href: "{path}"}
             title { "Helmet" }
@@ -44,15 +44,15 @@ fn HeadElements(cx: Scope, path: String) -> Element {
                 "#]
             }
         }
-    })
+    }
 }
 ```
 
-Reach your dynamic values down as owned properties (eg `String` and **not** `&'a str`).
-
-Also make sure that there are **no states** in your component where you use Helmet.
-
 Any children passed to the helmet component will then be placed in the `<head></head>` of your document.
+
+**IMPORTANT**: The nodes inside the `Helmet` component are not reactive, so they won't be updated
+when the value of them changes. So it's better to use static values inside the `Helmet`
+component instead of signals.
 
 They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
