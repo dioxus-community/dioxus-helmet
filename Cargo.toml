@@ -16,4 +16,3 @@ dioxus = { version = "0.5.1" }
 web-sys = { version = "0.3.59", features = ["Document", "Window", "Element", "HtmlHeadElement", "HtmlCollection", "NamedNodeMap", "NodeList"] }
 lazy_static = "1.4.0"
 rustc-hash = "1.1.0"
-js-sys = "0.3.59"

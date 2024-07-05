@@ -62,10 +62,10 @@ pub fn Helmet(children: Element) -> Element {
     use_hook_with_cleanup(move || {
         let document = web_sys::window()?.document()?;
         let head = document.head()?;
-        let element_maps = extract_element_maps(&children)?;
+        let mut element_maps = extract_element_maps(&children)?;
         let mut init_cache = INIT_CACHE.try_lock().ok()?;
 
-        element_maps.iter().for_each(|element_map| {
+        element_maps.iter_mut().for_each(|element_map| {
             let mut hasher = FxHasher::default();
             element_map.hash(&mut hasher);
             let hash = hasher.finish();
@@ -73,8 +73,8 @@ pub fn Helmet(children: Element) -> Element {
             if init_cache.contains(&hash) { return; }
             init_cache.push(hash);
 
-            if let Some(new_element) = element_map.try_into_element(&document, &hash) {
-                let _ = head.append_child(&new_element);
+            if let Some(new_element) = element_map.try_into_element(&document) {
+                let _ = head.append_child(new_element);
             }
         });
 
@@ -82,8 +82,6 @@ pub fn Helmet(children: Element) -> Element {
     },
     move |element_maps| {
         let Some(element_maps) = element_maps else { return; };
-        let Some(window) = web_sys::window() else { return; };
-        let Some(document) = window.document() else { return; };
         let Ok(mut init_cache) = INIT_CACHE.try_lock() else { return; };
 
         element_maps.iter().for_each(|element_map| {
@@ -95,17 +93,8 @@ pub fn Helmet(children: Element) -> Element {
                 init_cache.remove(index);
             }
 
-            if let Ok(children) =
-            document.query_selector_all(&format!("[data-helmet-id='{hash}']"))
-            {
-                if let Ok(Some(children_iter)) = js_sys::try_iter(&children) {
-                    children_iter.for_each(|child| {
-                        if let Ok(child) = child {
-                            let el = web_sys::Element::from(child);
-                            el.remove();
-                        };
-                    });
-                }
+            if let Some(element) = &element_map.mounted_element {
+                element.remove();
             }
         });
     });
@@ -113,31 +102,39 @@ pub fn Helmet(children: Element) -> Element {
     None
 }
 
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Clone)]
 struct ElementMap {
     tag: &'static str,
     attributes: Vec<(&'static str, String)>,
     inner_html: Option<&'static str>,
+    mounted_element: Option<web_sys::Element>,
+}
+
+impl Hash for ElementMap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tag.hash(state);
+        self.attributes.hash(state);
+        self.inner_html.hash(state);
+    }
 }
 
 impl ElementMap {
-    fn try_into_element(
-        &self,
-        document: &web_sys::Document,
-        hash: &u64,
-    ) -> Option<web_sys::Element> {
+    fn try_into_element(&mut self, document: &web_sys::Document) -> Option<&web_sys::Element> {
+        if self.mounted_element.is_some() {
+            return self.mounted_element.as_ref();
+        }
+
         let new_element = document.create_element(self.tag).ok()?;
 
         self.attributes.iter().try_for_each(|(name, value)| {
             new_element.set_attribute(name, value)
         }).ok()?;
-        new_element.set_attribute("data-helmet-id", &hash.to_string()).ok()?;
 
         if let Some(inner_html) = self.inner_html {
             new_element.set_inner_html(inner_html);
         }
-
-        Some(new_element)
+        self.mounted_element = Some(new_element);
+        self.mounted_element.as_ref()
     }
 }
 
@@ -184,7 +181,8 @@ fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
             Some(ElementMap {
                 tag,
                 attributes,
-                inner_html
+                inner_html,
+                mounted_element: None,
             })
         })
         .collect();
