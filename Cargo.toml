@@ -13,5 +13,5 @@ doctest = false
 
 [dependencies]
 dioxus = { version = "0.5.1" }
-web-sys = { version = "0.3.59", features = ["Document", "Window", "Element", "HtmlHeadElement", "HtmlCollection", "NamedNodeMap", "NodeList"] }
+web-sys = { version = "0.3.69", features = ["Document", "Window", "Element", "HtmlHeadElement"] }
 rustc-hash = "1.1.0"
