@@ -9,16 +9,16 @@
 //!
 //! ## Usage
 //! Import it in your code:
-//! ```
+//! ```rust
 //! use dioxus_helmet::Helmet;
 //! ```
 //!
 //! Then use it as a component like this:
 //!
 //! ```rust
-//! #[inline_props]
-//! fn HeadElements(cx: Scope, path: String) -> Element {
-//!     cx.render(rsx! {
+//! #[component]
+//! fn HeadElements(path: String) -> Element {
+//!     rsx! {
 //!         Helmet {
 //!             link { rel: "icon", href: "{path}"}
 //!             title { "Helmet" }
@@ -33,171 +33,166 @@
 //!                 "#]
 //!             }
 //!         }
-//!     })
+//!     }
 //! }
 //! ```
 //!
-//! Reach your dynamic values down as owned properties (eg `String` and **not** `&'a str`).
+//! Any children passed to the `Helmet` component will then be placed in the `<head></head>` of your document.
 //!
-//! Also make sure that there are **no states** in your component where you use Helmet.
-//!
-//! Any children passed to the helmet component will then be placed in the `<head></head>` of your document.
+//! **IMPORTANT**: The nodes inside the `Helmet` component are not reactive, so they won't be updated
+//! when the value of them changes. So it's better to use static values inside the `Helmet`
+//! component instead of signals.
 //!
 //! They will be visible while the component is rendered. Duplicates **won't** get appended multiple times.
 
+#![allow(non_snake_case)]
+
 use dioxus::prelude::*;
-use lazy_static::lazy_static;
+use dioxus_core::AttributeValue;
 use rustc_hash::FxHasher;
-use std::{
-    hash::{Hash, Hasher},
-    sync::Mutex,
-};
+use std::hash::{Hash, Hasher};
+use std::sync::Mutex;
 
-lazy_static! {
-    static ref INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+static INIT_CACHE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+
+/// Props to pass into the `Helmet` component.
+#[derive(PartialEq, Clone, Props)]
+pub struct HelmetProps {
+    /// Elements to be put in the head of your document.
+    pub children: Element,
 }
 
-#[derive(Props)]
-pub struct HelmetProps<'a> {
-    children: Element<'a>,
-}
+/// The `Helmet` Dioxus component.
+///
+/// This component allows to place **non-rective** nodes in the head of your document.
+pub fn Helmet(props: HelmetProps) -> Element {
+    use_hook_with_cleanup(move || {
+        let document = web_sys::window()?.document()?;
+        let head = document.head()?;
+        let mut element_maps = extract_element_maps(&props.children)?;
+        let mut init_cache = INIT_CACHE.try_lock().ok()?;
 
-#[allow(non_snake_case)]
-pub fn Helmet<'a>(cx: Scope<'a, HelmetProps<'a>>) -> Element {
-    if let Some(window) = web_sys::window() {
-        if let Some(document) = window.document() {
-            if let Some(head) = document.head() {
-                if let Some(element_maps) = extract_element_maps(&cx.props.children) {
-                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
-                        element_maps.iter().for_each(|element_map| {
-                            let mut hasher = FxHasher::default();
-                            element_map.hash(&mut hasher);
-                            let hash = hasher.finish();
+        element_maps.iter_mut().for_each(|element_map| {
+            let mut hasher = FxHasher::default();
+            element_map.hash(&mut hasher);
+            let hash = hasher.finish();
 
-                            if !init_cache.contains(&hash) {
-                                init_cache.push(hash);
+            if init_cache.contains(&hash) { return; }
+            init_cache.push(hash);
 
-                                if let Some(new_element) =
-                                    element_map.try_into_element(&document, &hash)
-                                {
-                                    let _ = head.append_child(&new_element);
-                                }
-                            }
-                        });
-                    }
-                }
+            if let Some(new_element) = element_map.try_into_element(&document) {
+                let _ = head.append_child(new_element);
             }
-        }
-    }
+        });
+
+        Some(element_maps)
+    },
+    move |element_maps| {
+        let Some(element_maps) = element_maps else { return; };
+        let Ok(mut init_cache) = INIT_CACHE.try_lock() else { return; };
+
+        element_maps.iter().for_each(|element_map| {
+            let mut hasher = FxHasher::default();
+            element_map.hash(&mut hasher);
+            let hash = hasher.finish();
+
+            if let Some(index) = init_cache.iter().position(|&c| c == hash) {
+                init_cache.remove(index);
+            }
+
+            if let Some(element) = &element_map.mounted_element {
+                element.remove();
+            }
+        });
+    });
 
     None
 }
 
-impl Drop for HelmetProps<'_> {
-    fn drop(&mut self) {
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(element_maps) = extract_element_maps(&self.children) {
-                    if let Ok(mut init_cache) = INIT_CACHE.try_lock() {
-                        element_maps.iter().for_each(|element_map| {
-                            let mut hasher = FxHasher::default();
-                            element_map.hash(&mut hasher);
-                            let hash = hasher.finish();
+#[derive(Debug, Clone)]
+struct ElementMap {
+    tag: &'static str,
+    attributes: Vec<(&'static str, String)>,
+    inner_html: Option<&'static str>,
+    mounted_element: Option<web_sys::Element>,
+}
 
-                            if let Some(index) = init_cache.iter().position(|&c| c == hash) {
-                                init_cache.remove(index);
-                            }
+impl Hash for ElementMap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tag.hash(state);
+        self.attributes.hash(state);
+        self.inner_html.hash(state);
+    }
+}
 
-                            if let Ok(children) =
-                                document.query_selector_all(&format!("[data-helmet-id='{hash}']"))
-                            {
-                                if let Ok(Some(children_iter)) = js_sys::try_iter(&children) {
-                                    children_iter.for_each(|child| {
-                                        if let Ok(child) = child {
-                                            let el = web_sys::Element::from(child);
-                                            el.remove();
-                                        };
-                                    });
-                                }
-                            }
-                        });
+impl ElementMap {
+    fn try_into_element(&mut self, document: &web_sys::Document) -> Option<&web_sys::Element> {
+        if self.mounted_element.is_some() {
+            return self.mounted_element.as_ref();
+        }
+
+        let new_element = document.create_element(self.tag).ok()?;
+
+        self.attributes.iter().try_for_each(|(name, value)| {
+            new_element.set_attribute(name, value)
+        }).ok()?;
+
+        if let Some(inner_html) = self.inner_html {
+            new_element.set_inner_html(inner_html);
+        }
+        self.mounted_element = Some(new_element);
+        self.mounted_element.as_ref()
+    }
+}
+
+fn extract_element_maps(children: &Element) -> Option<Vec<ElementMap>> {
+    use AttributeValue as AV;
+    use TemplateAttribute as TA;
+    use TemplateNode as TN;
+
+    let vnode = children.as_ref()?;
+    let template = vnode.template.get();
+
+    let elements = template.roots.iter()
+        .filter_map(|root| {
+            let TN::Element { tag, attrs, children, .. } = root else {
+                return None;
+            };
+
+            let mut attributes = vec![];
+            attrs.iter()
+                .for_each(|attr| match attr {
+                    TA::Static { name, value, .. } => attributes.push((*name, value.to_string())),
+                    TA::Dynamic { id } => vnode.dynamic_attrs[*id].iter().for_each(|attr| {
+                        match &attr.value {
+                            AV::Bool(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Float(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Int(v) => attributes.push((attr.name, v.to_string())),
+                            AV::Text(v) => attributes.push((attr.name, v.to_string())),
+                            AV::None | AV::Listener(_) | AV::Any(_) => {}
+                        }
+                    })
+                });
+
+            let inner_html = match children.first() {
+                Some(TN::Text { text }) => Some(*text),
+                Some(TN::Element { children, .. }) if children.len() == 1 => {
+                    match children.first() {
+                        Some(TN::Text { text }) => Some(*text),
+                        _ => None,
                     }
                 }
-            }
-        }
-    }
-}
+                _ => None,
+            };
 
-#[derive(Debug, Hash)]
-struct ElementMap<'a> {
-    tag: &'a str,
-    attributes: Vec<(&'a str, &'a str)>,
-    inner_html: Option<&'a str>,
-}
-
-impl<'a> ElementMap<'a> {
-    fn try_into_element(
-        &self,
-        document: &web_sys::Document,
-        hash: &u64,
-    ) -> Option<web_sys::Element> {
-        if let Ok(new_element) = document.create_element(self.tag) {
-            self.attributes.iter().for_each(|(name, value)| {
-                let _ = new_element.set_attribute(name, value);
-            });
-            let _ = new_element.set_attribute("data-helmet-id", &hash.to_string());
-
-            if let Some(inner_html) = self.inner_html {
-                new_element.set_inner_html(inner_html);
-            }
-
-            Some(new_element)
-        } else {
-            None
-        }
-    }
-}
-
-fn extract_element_maps<'a>(children: &'a Element) -> Option<Vec<ElementMap<'a>>> {
-    if let Some(VNode::Fragment(fragment)) = &children {
-        let elements = fragment
-            .children
-            .iter()
-            .flat_map(|child| {
-                if let VNode::Element(element) = child {
-                    let attributes = element
-                        .attributes
-                        .iter()
-                        .map(|attribute| {
-                            (attribute.attribute.name, attribute.value.as_text().unwrap())
-                        })
-                        .collect();
-
-                    let inner_html = match element.children.first() {
-                        Some(VNode::Text(vtext)) => Some(vtext.text),
-                        Some(VNode::Fragment(fragment)) if fragment.children.len() == 1 => {
-                            if let Some(VNode::Text(vtext)) = fragment.children.first() {
-                                Some(vtext.text)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    };
-
-                    Some(ElementMap {
-                        tag: element.tag,
-                        attributes,
-                        inner_html,
-                    })
-                } else {
-                    None
-                }
+            Some(ElementMap {
+                tag,
+                attributes,
+                inner_html,
+                mounted_element: None,
             })
-            .collect();
+        })
+        .collect();
 
-        Some(elements)
-    } else {
-        None
-    }
+    Some(elements)
 }
